@@ -3,6 +3,7 @@ import React from 'react';
 
 import { HapticTab } from '@/components/haptic-tab';
 import { IconSymbol } from '@/components/ui/icon-symbol';
+import { AntDesign } from '@expo/vector-icons'
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
@@ -20,21 +21,21 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Registro',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="house.fill" color={color} />,
+          tabBarIcon: ({ color }) => <AntDesign name="home" size={24} color="black" />
         }}
       />
       <Tabs.Screen
         name="QRScanner"
         options={{
           title: 'Escanear QR',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          tabBarIcon: ({ color }) => <AntDesign name="qrcode" size={24} color="black" />
         }}
       />
       <Tabs.Screen
-        name="Check-Logs"
+        name="Mensualidades"
         options={{
-          title: 'Registros',
-          tabBarIcon: ({ color }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
+          title: 'Mensualidades',
+          tabBarIcon: ({ color }) => <AntDesign name="dollar" size={24} color="black" />
         }}
       />
     </Tabs>

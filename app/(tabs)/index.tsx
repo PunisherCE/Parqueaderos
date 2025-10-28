@@ -1,4 +1,4 @@
-import { StyleSheet, View, Text, StatusBar, TextInput, FlatList, Pressable, GestureResponderEvent, Alert } from 'react-native';
+import { StyleSheet, View, Text, StatusBar, TextInput, FlatList, Pressable, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect } from 'react';
 
@@ -190,9 +190,9 @@ export default function HomeScreen() {
     // Now do something with the data
     setVehicles(vehicles);
     setTotal(total);
-  };
+    };
 
-  fetchData();
+    fetchData();
   }, []);
 
   return (
@@ -201,13 +201,20 @@ export default function HomeScreen() {
         barStyle={"light-content"}
         translucent={true} 
         backgroundColor="transparent"/>
-        <TextInput 
-          style={styles.textsInput}    
-          value={placa}   
-          placeholder='  Ingrese la Placa'
-          autoFocus={true}
-          onChangeText={text => placaHandler(text)}
-        />
+        <View style={{ flexDirection: 'row', justifyContent: 'center', alignContent: 'center', alignItems: 'center', width: '100%' }}>
+          <Pressable 
+            style={{ maxHeight: '30%', height: '28%', borderColor: 'white', borderRadius: 10, borderWidth: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 5 }}
+            android_ripple={{ color: '#555', borderless: true }}
+            onPress={() => setPlaca('')}>
+            <Text style={{ color: 'red', fontSize: 18 }}>❌</Text>
+          </Pressable>
+          <TextInput 
+            style={styles.textsInput}    
+            value={placa}   
+            placeholder='  Ingrese la Placa'
+            onChangeText={text => placaHandler(text)}
+          />
+        </View>
       <View style={{ flexDirection: 'row', justifyContent: 'center', width: '60%', marginBottom: 30 }}>
         <Pressable 
           style={[styles.pressables, buttonOneBoolean ? {backgroundColor: '#00808bff'} : {backgroundColor: 'gray'}]}
@@ -255,7 +262,8 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     minWidth: '60%',
-    marginHorizontal: 40,
+    marginLeft: 20,
+    marginRight: 40,
     marginBottom: '10%',
     marginTop: '10%',
     alignContent: 'center',

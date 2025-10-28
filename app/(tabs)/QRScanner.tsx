@@ -3,27 +3,10 @@ import { Camera, useCameraDevices } from 'react-native-vision-camera';
 import { useEffect } from 'react';
 import { View, Text } from 'react-native';
 
-const QRScanner = () => {
-
-    // const devices = useCameraDevices();
-    // const device = devices.back;
-    // const [frameProcessor, barcodes] = useScanBarcodes([BarcodeFormat.QR_CODE], {
-    //     checkInverted: true,
-    // });
-    // useEffect(() => {
-    //     console.log(barcodes);
-    // }, [barcodes]);
-
-    // if (device == null) return <View><Text>Loading...</Text></View>;
-    // return (
-    //     <View style={{ flex: 1 }}>
-    //         <Camera
-    //             style={{ flex: 1 }}
-    //             device={device}
-    //             isActive={true}
-    //             frameProcessor={frameProcessor}
-    //             frameProcessorFps={5}
-    //         />
-    //     </View>
-    // );
-};
+export default function QRScanner() {
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+      <Text style={{ color: '#fff' }}>QR Scanner Screen</Text>
+    </View>
+  );
+}

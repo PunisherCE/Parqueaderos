@@ -3,6 +3,7 @@
     "name": "Parqueaderos",
     "slug": "Parqueaderos",
     "version": "1.0.0",
+    "permissions": ["CAMERA"],
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "parqueaderos",

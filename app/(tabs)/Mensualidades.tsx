@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useEffect } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import React from 'react';
 import { Alert, FlatList, Pressable, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Checkbox } from "react-native-paper";
 
@@ -47,6 +48,15 @@ function formatColombianDate(date: Date): string {
 
 type TimeUnit = 'months' | 'weeks' 
 
+interface ParkingConfig {
+  maxMotos: string;
+  maxCarros: string;
+  precioHoraMotos: string;
+  precioHoraCarros: string;
+  precioMesMotos: string;
+  precioMesCarros: string;
+}
+
 interface Vehicle {
   placa: string;
   type: 'carro' | 'moto';
@@ -72,6 +82,18 @@ export default function Mensualidades() {
   const [buttonTwoBoolean, setButtonTwoBoolean] = React.useState<boolean>(false);
   const [buttonThreeBoolean, setButtonThreeBoolean] = React.useState<boolean>(false);
   const [isNewVehicle, setIsNewVehicle] = React.useState<boolean>(false);
+  const [parkingConfig, setParkingConfig] = React.useState<ParkingConfig>({
+    maxMotos: '50',
+    maxCarros: '30',
+    precioHoraMotos: '2000',
+    precioHoraCarros: '5000',
+    precioMesMotos: '40000',
+    precioMesCarros: '100000',
+  });
+  const [currentVehicleCounts, setCurrentVehicleCounts] = React.useState({
+    motos: 0,
+    carros: 0
+  });
 
   // Robust placa formatter: AAA-123 or AAA-123D (optional letter)
   function placaHandler(text: string) {
@@ -185,14 +207,35 @@ export default function Mensualidades() {
     const formatDate = formatColombianDate(finalTime)
     let totalMoney;
 
-    //cambiar los valores
+    // Check capacity before proceeding
+    if (type === 'moto') {
+      if (currentVehicleCounts.motos >= parseInt(parkingConfig.maxMotos)) {
+        Alert.alert('Error', 
+          `Se alcanzó el límite de motos en el parqueadero\n` +
+          `Total actual: ${currentVehicleCounts.motos}\n` +
+          `Límite: ${parkingConfig.maxMotos}`
+        );
+        return;
+      }
+    } else {
+      if (currentVehicleCounts.carros >= parseInt(parkingConfig.maxCarros)) {
+        Alert.alert('Error', 
+          `Se alcanzó el límite de carros en el parqueadero\n` +
+          `Total actual: ${currentVehicleCounts.carros}\n` +
+          `Límite: ${parkingConfig.maxCarros}`
+        );
+        return;
+      }
+    }
+
+    // Calculate price based on config
     if (type === 'carro'){
       if (monthsOrWeeks === 'months'){
-        totalMoney = duration * 100000;
-      } else totalMoney = duration * 30000;
+        totalMoney = duration * parseInt(parkingConfig.precioMesCarros);
+      } else totalMoney = duration * (parseInt(parkingConfig.precioMesCarros) / 4); // Week price is month price divided by 4
     } else if (monthsOrWeeks == 'months'){
-      totalMoney = duration * 40000;
-    } else totalMoney = duration * 15000
+      totalMoney = duration * parseInt(parkingConfig.precioMesMotos);
+    } else totalMoney = duration * (parseInt(parkingConfig.precioMesMotos) / 4); // Week price is month price divided by 4
 
     const logEntry: Vehicle = {
       placa,
@@ -232,16 +275,24 @@ export default function Mensualidades() {
             if (payed) {
               // replace with the new payment
               if (vehicle.type === 'carro') {
-                totalMoney = monthsOrWeeks === 'months' ? duration * 100000 : duration * 30000;
+                totalMoney = monthsOrWeeks === 'months' ? 
+                  duration * parseInt(parkingConfig.precioMesCarros) : 
+                  duration * (parseInt(parkingConfig.precioMesCarros) / 4);
               } else {
-                totalMoney = monthsOrWeeks === 'months' ? duration * 40000 : duration * 15000;
+                totalMoney = monthsOrWeeks === 'months' ? 
+                  duration * parseInt(parkingConfig.precioMesMotos) : 
+                  duration * (parseInt(parkingConfig.precioMesMotos) / 4);
               }
             } else {
               // accumulate unpaid balance
               if (vehicle.type === 'carro') {
-                totalMoney = vehicle.totalMoney + (monthsOrWeeks === 'months' ? duration * 100000 : duration * 30000);
+                totalMoney = vehicle.totalMoney + (monthsOrWeeks === 'months' ? 
+                  duration * parseInt(parkingConfig.precioMesCarros) : 
+                  duration * (parseInt(parkingConfig.precioMesCarros) / 4));
               } else {
-                totalMoney = vehicle.totalMoney + (monthsOrWeeks === 'months' ? duration * 40000 : duration * 15000);
+                totalMoney = vehicle.totalMoney + (monthsOrWeeks === 'months' ? 
+                  duration * parseInt(parkingConfig.precioMesMotos) : 
+                  duration * (parseInt(parkingConfig.precioMesMotos) / 4));
               }
             }
 
@@ -318,16 +369,62 @@ export default function Mensualidades() {
     }
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-    const { vehicles, total } = await loadVehicleData();
-    // Now do something with the data
-    setVehicles(vehicles);
-    setTotal(total);
-    };
+  const loadParkingConfig = async () => {
+    try {
+      const savedConfig = await AsyncStorage.getItem('parkingConfig');
+      if (savedConfig) {
+        setParkingConfig(JSON.parse(savedConfig));
+      }
+    } catch (error) {
+      console.error('Error loading parking config:', error);
+    }
+  };
 
-    fetchData();
-  }, []);
+  // Track total vehicles across both hourly and monthly parking
+  useFocusEffect(
+    React.useCallback(() => {
+      const loadAllVehicles = async () => {
+        try {
+          // Load hourly vehicles
+          const hourlyVehiclesJson = await AsyncStorage.getItem('parqueaderosVehicles');
+          const hourlyVehicles = hourlyVehiclesJson ? JSON.parse(hourlyVehiclesJson) : [];
+          
+          // Count vehicles by type from both hourly and monthly
+          const totalMotos = vehicles.filter(v => v.type === 'moto').length +
+                            hourlyVehicles.filter((v: any) => v.type === 'moto').length;
+          const totalCarros = vehicles.filter(v => v.type === 'carro').length +
+                             hourlyVehicles.filter((v: any) => v.type === 'carro').length;
+
+          setCurrentVehicleCounts({
+            motos: totalMotos,
+            carros: totalCarros
+          });
+        } catch (error) {
+          console.error('Error loading vehicle counts:', error);
+        }
+      };
+
+      loadAllVehicles();
+    }, [vehicles])
+  );
+
+  useFocusEffect(
+    React.useCallback(() => {
+      const fetchData = async () => {
+        const { vehicles, total } = await loadVehicleData();
+        setVehicles(vehicles);
+        setTotal(total);
+        await loadParkingConfig();
+      };
+
+      fetchData();
+
+      // Optional: return a cleanup function if needed
+      return () => {
+        // Any cleanup code if needed
+      };
+    }, [])
+  );
 
 
   const showAlert = () => {

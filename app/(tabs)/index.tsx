@@ -1,8 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
+import { useFocusEffect } from '@react-navigation/native';
 import { Barcode } from 'expo-barcode-generator';
 import * as Print from 'expo-print';
-import React, { useEffect, useRef } from 'react';
+import React, { useRef } from 'react';
 import { Alert, FlatList, Pressable, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
 import ViewShot from "react-native-view-shot";
 
@@ -18,6 +19,15 @@ function isNumericSlice(str: string, start: number, end: number): boolean {
 }
 
 
+interface ParkingConfig {
+  maxMotos: string;
+  maxCarros: string;
+  precioHoraMotos: string;
+  precioHoraCarros: string;
+  precioMesMotos: string;
+  precioMesCarros: string;
+}
+
 interface Vehicle {
   placa: string;
   type: 'carro' | 'moto';
@@ -25,17 +35,55 @@ interface Vehicle {
 }
 
 export default function HomeScreen() {
-
   const [placa, setPlaca] = React.useState<string>('');
-  // Update state initializations with proper typing and empty arrays
   const [filteredVehicles, setFilteredVehicles] = React.useState<Vehicle[]>([]);
   const [buttonOneBoolean, setButtonOneBoolean] = React.useState<boolean>(false);
   const [buttonTwoBoolean, setButtonTwoBoolean] = React.useState<boolean>(false);
   const [vehicles, setVehicles] = React.useState<Vehicle[]>([]);
   const [total, setTotal] = React.useState<number>(0);
   const [isPrinting, setIsPrinting] = React.useState<boolean>(false);
+  const [parkingConfig, setParkingConfig] = React.useState<ParkingConfig>({
+    maxMotos: '50',
+    maxCarros: '30',
+    precioHoraMotos: '2000',
+    precioHoraCarros: '5000',
+    precioMesMotos: '40000',
+    precioMesCarros: '100000',
+  });
+  const [currentVehicleCounts, setCurrentVehicleCounts] = React.useState({
+    motos: 0,
+    carros: 0
+  });
 
   const barcodeRef = useRef<ViewShot>(null);
+
+  // Track total vehicles across both hourly and monthly parking
+  useFocusEffect(
+    React.useCallback(() => {
+      const loadAllVehicles = async () => {
+        try {
+          // Load monthly vehicles
+          const monthlyVehiclesJson = await AsyncStorage.getItem('mensualidadesVehicles');
+          const monthlyVehicles = monthlyVehiclesJson ? JSON.parse(monthlyVehiclesJson) : [];
+          
+          // Count vehicles by type from both hourly and monthly
+          const totalMotos = vehicles.filter(v => v.type === 'moto').length +
+                            monthlyVehicles.filter((v: any) => v.type === 'moto').length;
+          const totalCarros = vehicles.filter(v => v.type === 'carro').length +
+                             monthlyVehicles.filter((v: any) => v.type === 'carro').length;
+
+          setCurrentVehicleCounts({
+            motos: totalMotos,
+            carros: totalCarros
+          });
+        } catch (error) {
+          console.error('Error loading vehicle counts:', error);
+        }
+      };
+
+      loadAllVehicles();
+    }, [vehicles])
+  ); // Update whenever vehicles changes
 
 
 
@@ -66,8 +114,24 @@ export default function HomeScreen() {
     
     if (isAlphabetic(placa[6]) || placa.length === 6) {
       type = 'moto';
+      if (currentVehicleCounts.motos >= parseInt(parkingConfig.maxMotos)) {
+        Alert.alert('Error', 
+          `Se alcanzó el límite de motos en el parqueadero\n` +
+          `Total actual: ${currentVehicleCounts.motos}\n` +
+          `Límite: ${parkingConfig.maxMotos}`
+        );
+        return;
+      }
     } else {
       type = 'carro';
+      if (currentVehicleCounts.carros >= parseInt(parkingConfig.maxCarros)) {
+        Alert.alert('Error', 
+          `Se alcanzó el límite de carros en el parqueadero\n` +
+          `Total actual: ${currentVehicleCounts.carros}\n` +
+          `Límite: ${parkingConfig.maxCarros}`
+        );
+        return;
+      }
     }
 
     const logEntry: Vehicle = {
@@ -98,8 +162,24 @@ export default function HomeScreen() {
     
     if (isAlphabetic(placa[6]) || placa.length === 6) {
       type = 'moto';
+      if (currentVehicleCounts.motos >= parseInt(parkingConfig.maxMotos)) {
+        Alert.alert('Error', 
+          `Se alcanzó el límite de motos en el parqueadero\n` +
+          `Total actual: ${currentVehicleCounts.motos}\n` +
+          `Límite: ${parkingConfig.maxMotos}`
+        );
+        return;
+      }
     } else {
       type = 'carro';
+      if (currentVehicleCounts.carros >= parseInt(parkingConfig.maxCarros)) {
+        Alert.alert('Error', 
+          `Se alcanzó el límite de carros en el parqueadero\n` +
+          `Total actual: ${currentVehicleCounts.carros}\n` +
+          `Límite: ${parkingConfig.maxCarros}`
+        );
+        return;
+      }
     }
 
     const logEntry: Vehicle = {
@@ -166,7 +246,9 @@ export default function HomeScreen() {
       const currentTime = new Date();
       const timeDiff = Math.abs(currentTime.getTime() - vehicle.time.getTime());
       const diffHours = Math.ceil(timeDiff / (1000 * 3600)); // convert to hours and round up
-      let ratePerHour = vehicle.type === 'carro' ? 5000 : 2000; // example rates
+      let ratePerHour = vehicle.type === 'carro' ? 
+        parseInt(parkingConfig.precioHoraCarros) : 
+        parseInt(parkingConfig.precioHoraMotos);
       let totalBill = diffHours * ratePerHour;
   
     Alert.alert(
@@ -226,16 +308,29 @@ export default function HomeScreen() {
     }
   };
 
-  useEffect(() => {
-    const fetchData = async () => {
-    const { vehicles, total } = await loadVehicleData();
-    // Now do something with the data
-    setVehicles(vehicles);
-    setTotal(total);
-    };
+  const loadParkingConfig = async () => {
+    try {
+      const savedConfig = await AsyncStorage.getItem('parkingConfig');
+      if (savedConfig) {
+        setParkingConfig(JSON.parse(savedConfig));
+      }
+    } catch (error) {
+      console.error('Error loading parking config:', error);
+    }
+  };
 
-    fetchData();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      const fetchData = async () => {
+        const { vehicles, total } = await loadVehicleData();
+        setVehicles(vehicles);
+        setTotal(total);
+        await loadParkingConfig();
+      };
+
+      fetchData();
+    }, [])
+  );
 
   /*
   
@@ -301,10 +396,6 @@ export default function HomeScreen() {
     }
   };
 
-
-
-
-
   return (
     <View style={styles.container}>
       <StatusBar 
@@ -312,6 +403,10 @@ export default function HomeScreen() {
         translucent={true} 
         backgroundColor="transparent"/>
       <View style={{backgroundColor: '#121212', borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderBlockColor: '#363636ff', borderWidth: 3, marginBottom: 22}}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-around', alignContent: 'center', alignItems: 'center', width: '100%'}}>
+          <Text style={{ color: '#fff', fontSize: 18, marginVertical: 10 }}>Carros: {currentVehicleCounts.carros}/{parkingConfig.maxCarros}</Text>
+          <Text style={{ color: '#fff', fontSize: 18, marginVertical: 10, marginLeft: 20 }}>Motos: {currentVehicleCounts.motos}/{parkingConfig.maxMotos}</Text>
+        </View>
         <View style={{ flexDirection: 'row', justifyContent: 'center', alignContent: 'center', alignItems: 'center', width: '100%' }}>
           <Pressable 
             style={{ maxHeight: '30%', height: '28%', borderColor: 'white', borderRadius: 10, borderWidth: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 5 }}
@@ -323,6 +418,7 @@ export default function HomeScreen() {
             style={styles.textsInput}    
             value={placa}   
             placeholder='  Ingrese la Placa'
+            placeholderTextColor="#999"
             onChangeText={text => placaHandler(text)}
           />
         </View>
@@ -408,7 +504,7 @@ const styles = StyleSheet.create({
   },
   textsInput: {
     color: '#fff',
-    backgroundColor: 'gray',
+    backgroundColor: '#222',
     fontSize: 24,
     fontWeight: 'bold',
     minWidth: '60%',

@@ -137,7 +137,7 @@ export default function HomeScreen() {
           style: "cancel"
         },
         {
-          text: "OK",
+          text: "Pagar",
           onPress: () => {
             setVehicles(prevVehicles => prevVehicles.filter(v => v.placa !== placa));
             setPlaca('');
@@ -201,6 +201,7 @@ export default function HomeScreen() {
         barStyle={"light-content"}
         translucent={true} 
         backgroundColor="transparent"/>
+      <View style={{backgroundColor: '#121212', borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderBlockColor: '#363636ff', borderWidth: 3}}>
         <View style={{ flexDirection: 'row', justifyContent: 'center', alignContent: 'center', alignItems: 'center', width: '100%' }}>
           <Pressable 
             style={{ maxHeight: '30%', height: '28%', borderColor: 'white', borderRadius: 10, borderWidth: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 5 }}
@@ -215,21 +216,22 @@ export default function HomeScreen() {
             onChangeText={text => placaHandler(text)}
           />
         </View>
-      <View style={{ flexDirection: 'row', justifyContent: 'center', width: '60%', marginBottom: 30 }}>
-        <Pressable 
-          style={[styles.pressables, buttonOneBoolean ? {backgroundColor: '#00808bff'} : {backgroundColor: 'gray'}]}
-          disabled={!buttonOneBoolean}
-          android_ripple={{ color: '#fff', borderless: true }}
-          onPress={handleSubmit}>
-          <Text style={{ color: '#fff', fontSize: 18 }}>Registrar</Text>
-        </Pressable>
-        <Pressable 
-          style={[styles.pressables, buttonTwoBoolean ? {backgroundColor: '#00808bff'} : {backgroundColor: 'gray'}]}
-          disabled={!buttonTwoBoolean}
-          android_ripple={{ color: '#fff', borderless: true }}
-          onPress={showAlert}>
-          <Text style={{ color: '#fff', fontSize: 18 }}>Facturar</Text>
-        </Pressable>
+        <View style={{ flexDirection: 'row', justifyContent: 'center', width: '60%', marginBottom: 30 }}>
+          <Pressable 
+            style={[styles.pressables, buttonOneBoolean ? {backgroundColor: '#00808bff'} : {backgroundColor: 'gray'}]}
+            disabled={!buttonOneBoolean}
+            android_ripple={{ color: '#fff', borderless: true }}
+            onPress={handleSubmit}>
+            <Text style={{ color: '#fff', fontSize: 18 }}>Registrar</Text>
+          </Pressable>
+          <Pressable 
+            style={[styles.pressables, buttonTwoBoolean ? {backgroundColor: '#00808bff'} : {backgroundColor: 'gray'}]}
+            disabled={!buttonTwoBoolean}
+            android_ripple={{ color: '#fff', borderless: true }}
+            onPress={showAlert}>
+            <Text style={{ color: '#fff', fontSize: 18 }}>Facturar</Text>
+          </Pressable>
+        </View>
       </View>
       <FlatList
         contentContainerStyle={{ paddingBottom: 20, flexGrow: 1, borderBottomWidth: 20, borderBottomColor: '#555', marginBottom: 20 }}

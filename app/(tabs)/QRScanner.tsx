@@ -1,12 +1,34 @@
-import { useScanBarcodes, BarcodeFormat } from 'vision-camera-code-scanner';
-import { Camera, useCameraDevices } from 'react-native-vision-camera';
-import { useEffect } from 'react';
-import { View, Text } from 'react-native';
+import React from 'react';
+import { StatusBar, StyleSheet, Text, View } from 'react-native';
+
+interface Vehicle {
+  placa: string;
+  type: 'car' | 'bike';
+  time: Date;
+}
 
 export default function QRScanner() {
+  
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
-      <Text style={{ color: '#fff' }}>QR Scanner Screen</Text>
+    <View style={styles.container}>
+      <StatusBar 
+              barStyle={"light-content"}
+              translucent={true} 
+              backgroundColor="transparent"/>
+      <Text style={styles.text}>QR Scanner Component is currently disabled.</Text>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000',
+    paddingTop: StatusBar.currentHeight! + 5,
+  },
+  text: {
+    color: '#fff',
+    fontSize: 18,
+    textAlign: 'center',
+  },
+});

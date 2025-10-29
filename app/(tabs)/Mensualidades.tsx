@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { useEffect } from 'react';
-import { StyleSheet, View, Text, StatusBar, Pressable, TextInput, FlatList, Alert } from 'react-native';
+import { Alert, FlatList, Pressable, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Checkbox } from "react-native-paper";
 
 function isAlphabetic(str: string): boolean {
@@ -49,7 +49,7 @@ type TimeUnit = 'months' | 'weeks'
 
 interface Vehicle {
   placa: string;
-  type: 'car' | 'bike';
+  type: 'carro' | 'moto';
   name: string,
   cedula: string,
   duration: number,
@@ -129,18 +129,28 @@ export default function Mensualidades() {
   React.useEffect(() => {
     const normalized = placa;
     if (normalized.length >= 6) {
-      const exists = vehicles.some(v => v.placa === normalized);
-      setButtonOneBoolean(!exists); // Register if not exists
-      setButtonTwoBoolean(exists);  // Bill if exists
-      setButtonThreeBoolean(exists);
-      setIsNewVehicle(true)
+      // Check if vehicles array exists and has items
+      if (vehicles && vehicles.length > 0) {
+        const exists = vehicles.some(v => v.placa === normalized);
+        console.log('Vehicle exists:', exists, 'Name:', name, 'Duration:', duration);
+        setButtonOneBoolean(!exists && name !== '' && duration !== 0); // Register if not exists
+        setButtonTwoBoolean(exists);  // Bill if exists
+        setButtonThreeBoolean(exists && duration !== 0);
+      } else {
+        // If vehicles is empty, this is definitely a new vehicle
+        console.log('Vehicles array is empty, enabling register button if name and duration are set');
+        setButtonOneBoolean(name !== '' && duration !== 0);
+        setButtonTwoBoolean(false);
+        setButtonThreeBoolean(false);
+      }
+      setIsNewVehicle(true);
     } else {
       setButtonOneBoolean(false);
       setButtonTwoBoolean(false);
       setButtonThreeBoolean(false);
-      setIsNewVehicle(false)
+      setIsNewVehicle(false);
     }
-  }, [placa, vehicles]);
+  }, [placa, vehicles, name, duration]); // Added name and duration to dependencies
 
   function selectVeicle(itemPlaca: string): void {
     setPlaca(itemPlaca);
@@ -152,6 +162,7 @@ export default function Mensualidades() {
   }
 
   function timeHandler(text: string): void {
+    if (text && buttonTwoBoolean) setButtonThreeBoolean(true)
     const digits = text.replace(/[^0-9]/g, '');
     setDuration(digits === '' ? 0 : parseInt(digits, 10));
   }
@@ -167,15 +178,15 @@ export default function Mensualidades() {
     if (!duration || !name) return;
 
     const currentTime = new Date();
-    const type: 'car' | 'bike' = (placa[6] && isAlphabetic(placa[6])) || placa.length === 6 ? 'bike' : 'car';
-    const cedulaInside = cedula? cedula : ''
+    const type: 'carro' | 'moto' = (placa[6] && isAlphabetic(placa[6])) || placa.length === 6 ? 'moto' : 'carro';
+    const cedulaInside = cedula? cedula : 'No'
     const monthsOrWeeks: TimeUnit = tiempo ? 'months' : 'weeks'
     const finalTime = addToDate(currentTime, duration, monthsOrWeeks)
     const formatDate = formatColombianDate(finalTime)
     let totalMoney;
 
     //cambiar los valores
-    if (type === 'car'){
+    if (type === 'carro'){
       if (monthsOrWeeks === 'months'){
         totalMoney = duration * 100000;
       } else totalMoney = duration * 30000;
@@ -220,14 +231,14 @@ export default function Mensualidades() {
             let totalMoney: number;
             if (payed) {
               // replace with the new payment
-              if (vehicle.type === 'car') {
+              if (vehicle.type === 'carro') {
                 totalMoney = monthsOrWeeks === 'months' ? duration * 100000 : duration * 30000;
               } else {
                 totalMoney = monthsOrWeeks === 'months' ? duration * 40000 : duration * 15000;
               }
             } else {
               // accumulate unpaid balance
-              if (vehicle.type === 'car') {
+              if (vehicle.type === 'carro') {
                 totalMoney = vehicle.totalMoney + (monthsOrWeeks === 'months' ? duration * 100000 : duration * 30000);
               } else {
                 totalMoney = vehicle.totalMoney + (monthsOrWeeks === 'months' ? duration * 40000 : duration * 15000);

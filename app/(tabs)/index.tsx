@@ -1,6 +1,12 @@
-import { StyleSheet, View, Text, StatusBar, TextInput, FlatList, Pressable, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { useEffect } from 'react';
+import NetInfo from '@react-native-community/netinfo';
+import { Barcode } from 'expo-barcode-generator';
+import * as Print from 'expo-print';
+import React, { useEffect, useRef } from 'react';
+import { Alert, FlatList, Pressable, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
+import ViewShot from "react-native-view-shot";
+
+
 
 function isAlphabetic(str: string): boolean {
   return /^[A-Za-z]+$/.test(str);
@@ -14,7 +20,7 @@ function isNumericSlice(str: string, start: number, end: number): boolean {
 
 interface Vehicle {
   placa: string;
-  type: 'car' | 'bike';
+  type: 'carro' | 'moto';
   time: Date;
 }
 
@@ -27,7 +33,9 @@ export default function HomeScreen() {
   const [buttonTwoBoolean, setButtonTwoBoolean] = React.useState<boolean>(false);
   const [vehicles, setVehicles] = React.useState<Vehicle[]>([]);
   const [total, setTotal] = React.useState<number>(0);
+  const [isPrinting, setIsPrinting] = React.useState<boolean>(false);
 
+  const barcodeRef = useRef<ViewShot>(null);
 
 
 
@@ -50,14 +58,48 @@ export default function HomeScreen() {
     }
   }, [placa, vehicles]);
 
-  function handleSubmit() {
-    const currentTime = new Date(Date.now());
-    let type: 'car' | 'bike';
+  async function handleSubmit() {
+    // Create date with local timezone offset
+    const now = new Date();
+    const currentTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+    let type: 'carro' | 'moto';
     
     if (isAlphabetic(placa[6]) || placa.length === 6) {
-      type = 'bike';
+      type = 'moto';
     } else {
-      type = 'car';
+      type = 'carro';
+    }
+
+    const logEntry: Vehicle = {
+      placa,
+      type,
+      time: currentTime
+    };
+
+    try {
+      // First print the barcode while we still have the placa value
+      await printBarcode();
+      
+      // Only after successful printing, update the state
+      setVehicles(prevVehicles => [logEntry, ...prevVehicles]);
+      setPlaca('');
+      await saveVehicleData([logEntry, ...vehicles], 0);
+    } catch (error) {
+      console.error('Error in handleSubmit:', error);
+      Alert.alert('Error', 'Hubo un problema al registrar el vehículo');
+    }
+  }
+
+  function handleSubmit2(){
+    // Create date with local timezone offset
+    const now = new Date();
+    const currentTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+    let type: 'carro' | 'moto';
+    
+    if (isAlphabetic(placa[6]) || placa.length === 6) {
+      type = 'moto';
+    } else {
+      type = 'carro';
     }
 
     const logEntry: Vehicle = {
@@ -69,7 +111,7 @@ export default function HomeScreen() {
     setVehicles(prevVehicles => [logEntry, ...prevVehicles]);
     setPlaca('');
     saveVehicleData([logEntry, ...vehicles], 0);
-}
+  }
 
   function placaHandler(text: string) {
     if (text.length === 0) {
@@ -124,7 +166,7 @@ export default function HomeScreen() {
       const currentTime = new Date();
       const timeDiff = Math.abs(currentTime.getTime() - vehicle.time.getTime());
       const diffHours = Math.ceil(timeDiff / (1000 * 3600)); // convert to hours and round up
-      let ratePerHour = vehicle.type === 'car' ? 5000 : 2000; // example rates
+      let ratePerHour = vehicle.type === 'carro' ? 5000 : 2000; // example rates
       let totalBill = diffHours * ratePerHour;
   
     Alert.alert(
@@ -195,13 +237,81 @@ export default function HomeScreen() {
     fetchData();
   }, []);
 
+  /*
+  
+
+  */
+
+  const printBarcode = async () => {
+    if (!placa) {
+      Alert.alert('Error', 'No hay placa para imprimir');
+      return;
+    }
+
+    try {
+      setIsPrinting(true);
+      
+      // Add a small delay to ensure the component is rendered
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const uri = await barcodeRef.current?.capture!();
+      if (!uri) {
+        throw new Error('No se pudo generar el código de barras');
+      }
+
+      const currentTime = new Date().toLocaleString();
+      const html = `
+        <html>
+          <body style="text-align:center; font-family: Arial, sans-serif; padding: 20px;">
+            <div style="border: 1px solid #000; padding: 15px; max-width: 300px; margin: 0 auto;">
+              <h2 style="margin: 0 0 10px 0;">Ticket de Parqueo</h2>
+              <p style="font-size: 18px; margin: 5px 0;">Placa: ${placa}</p>
+              <p style="font-size: 14px; margin: 5px 0;">Fecha: ${currentTime}</p>
+              <div style="margin: 15px 0;">
+                <img src="${uri}" style="width:200px;" />
+              </div>
+              <p style="font-size: 12px; margin-top: 15px;">
+                Presente este ticket al retirar su vehículo
+              </p>
+            </div>
+          </body>
+        </html>
+      `;
+
+      await Print.printAsync({
+        html,
+        printerUrl: undefined // Let the user choose the printer
+      });
+    } catch (error) {
+      console.error('Print error:', error);
+      Alert.alert('Error', 'No se pudo imprimir el ticket');
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
+  const handleConditionalSubmit = async () => {
+    const state = await NetInfo.fetch();
+    const isWifi = state.isConnected && state.type === 'wifi';
+
+    if (isWifi) {
+      await handleSubmit();  // with barcode printing
+    } else {
+      handleSubmit2();       // offline fallback
+    }
+  };
+
+
+
+
+
   return (
     <View style={styles.container}>
       <StatusBar 
         barStyle={"light-content"}
         translucent={true} 
         backgroundColor="transparent"/>
-      <View style={{backgroundColor: '#121212', borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderBlockColor: '#363636ff', borderWidth: 3}}>
+      <View style={{backgroundColor: '#121212', borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderBlockColor: '#363636ff', borderWidth: 3, marginBottom: 22}}>
         <View style={{ flexDirection: 'row', justifyContent: 'center', alignContent: 'center', alignItems: 'center', width: '100%' }}>
           <Pressable 
             style={{ maxHeight: '30%', height: '28%', borderColor: 'white', borderRadius: 10, borderWidth: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 5 }}
@@ -221,7 +331,10 @@ export default function HomeScreen() {
             style={[styles.pressables, buttonOneBoolean ? {backgroundColor: '#00808bff'} : {backgroundColor: 'gray'}]}
             disabled={!buttonOneBoolean}
             android_ripple={{ color: '#fff', borderless: true }}
-            onPress={handleSubmit}>
+            onPress={() => {
+              setButtonTwoBoolean(false);
+              handleConditionalSubmit();
+            }}>
             <Text style={{ color: '#fff', fontSize: 18 }}>Registrar</Text>
           </Pressable>
           <Pressable 
@@ -245,6 +358,41 @@ export default function HomeScreen() {
           </Pressable>
         )}
       />
+      <ViewShot
+        ref={barcodeRef}
+        options={{ 
+          format: 'png', 
+          quality: 1,
+          result: 'data-uri',
+          width: 300,
+          height: 100
+        }}
+        style={{
+          position: 'absolute',
+          opacity: 0,
+          width: 300,
+          height: 100,
+        }}
+        >
+          <View style={{
+            backgroundColor: 'white',
+            width: '100%',
+            height: '100%',
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}>
+            <Barcode
+              value={placa ? placa.replace(/-/g, '') : ' '}
+              options={{ 
+                format: 'CODE128',
+                background: 'white',
+                height: 80,
+                width: 2
+              }}
+              rotation={0}
+            />
+          </View>
+      </ViewShot>
     </View>
   );
 }

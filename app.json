@@ -3,7 +3,9 @@
     "name": "Parqueaderos",
     "slug": "Parqueaderos",
     "version": "1.0.0",
-    "permissions": ["CAMERA"],
+    "permissions": [
+      "CAMERA"
+    ],
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "parqueaderos",
@@ -20,7 +22,12 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.CAMERA"
+      ],
+      "package": "com.punisher_ce.Parqueaderos"
     },
     "web": {
       "output": "static",
@@ -39,7 +46,8 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-barcode-scanner"
     ],
     "experiments": {
       "typedRoutes": true,

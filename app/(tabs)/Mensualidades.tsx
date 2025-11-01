@@ -1,8 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
-import React from 'react';
+import { Barcode } from 'expo-barcode-generator';
+import * as Print from 'expo-print';
+import React, { useRef } from 'react';
 import { Alert, FlatList, Pressable, StatusBar, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Checkbox } from "react-native-paper";
+import ViewShot from 'react-native-view-shot';
 
 function isAlphabetic(str: string): boolean {
   return /^[A-Za-z]+$/.test(str);
@@ -43,6 +46,19 @@ function formatColombianDate(date: Date): string {
     minute: '2-digit',
     hour12: true,
   }).format(date);
+}
+
+function formatDateForPrint(dateInput: Date | string): string {
+  const d = (dateInput instanceof Date) ? dateInput : new Date(dateInput);
+  const day = d.getDate();
+  const monthNames = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const month = monthNames[d.getMonth()];
+  const year = d.getFullYear();
+  let hours = d.getHours();
+  const minutes = d.getMinutes().toString().padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  hours = hours % 12 || 12;
+  return `${day} de ${month} de ${year} ${hours}:${minutes} ${ampm}`;
 }
 
 
@@ -94,6 +110,10 @@ export default function Mensualidades() {
     motos: 0,
     carros: 0
   });
+
+  const barcodeRef = useRef<ViewShot>(null);
+  const [isPrinting, setIsPrinting] = React.useState<boolean>(false);
+  const [printingData, setPrintingData] = React.useState<{ placa: string; formatedDate: string; type?: string } | null>(null);
 
   // Robust placa formatter: AAA-123 or AAA-123D (optional letter)
   function placaHandler(text: string) {
@@ -194,7 +214,7 @@ export default function Mensualidades() {
     setCedula(digits);
   }
 
-  function handleSubmit(): void {
+  async function handleSubmit(): Promise<void> {
     // basic validation
     if (!placa || placa.length < 6) return;
     if (!duration || !name) return;
@@ -248,6 +268,14 @@ export default function Mensualidades() {
       totalMoney
     };
 
+    try {
+      // Try printing the monthly ticket before saving so the UI still has placa/formatted date
+      await printMonthlyTicket(logEntry);
+    } catch (err) {
+      // If printing fails, continue to save the entry
+      console.warn('Printing failed, continuing to save:', err);
+    }
+
     setVehicles(prev => [logEntry, ...prev]);
     // clear form fields after registering
     setPlaca('');
@@ -255,7 +283,7 @@ export default function Mensualidades() {
     setDuration(0);
     setCedula('');
     setIsNewVehicle(true);
-    saveVehicleData([logEntry, ...vehicles]);
+    await saveVehicleData([logEntry, ...vehicles]);
   }
 
   function renewMonth(): void {
@@ -264,52 +292,66 @@ export default function Mensualidades() {
 
     const monthsOrWeeks: TimeUnit = tiempo ? 'months' : 'weeks';
 
-    const applyRenew = (payed: boolean) => {
-      setVehicles(prev => {
-        const updatedList = prev.map(vehicle => {
-          if (vehicle.placa === placa) {
-            const extendedTime = addToDate(vehicle.time, duration, monthsOrWeeks);
-            const updatedFormattedDate = formatColombianDate(extendedTime);
+    const applyRenew = async (payed: boolean) => {
+      // Build updated list from current state so we can access the new vehicle entry
+      const updatedList = vehicles.map(vehicle => {
+        if (vehicle.placa === placa) {
+          const extendedTime = addToDate(vehicle.time, duration, monthsOrWeeks);
+          const updatedFormattedDate = formatColombianDate(extendedTime);
 
-            let totalMoney: number;
-            if (payed) {
-              // replace with the new payment
-              if (vehicle.type === 'carro') {
-                totalMoney = monthsOrWeeks === 'months' ? 
-                  duration * parseInt(parkingConfig.precioMesCarros) : 
-                  duration * (parseInt(parkingConfig.precioMesCarros) / 4);
-              } else {
-                totalMoney = monthsOrWeeks === 'months' ? 
-                  duration * parseInt(parkingConfig.precioMesMotos) : 
-                  duration * (parseInt(parkingConfig.precioMesMotos) / 4);
-              }
+          let totalMoney: number;
+          if (payed) {
+            // replace with the new payment
+            if (vehicle.type === 'carro') {
+              totalMoney = monthsOrWeeks === 'months' ? 
+                duration * parseInt(parkingConfig.precioMesCarros) : 
+                duration * (parseInt(parkingConfig.precioMesCarros) / 4);
             } else {
-              // accumulate unpaid balance
-              if (vehicle.type === 'carro') {
-                totalMoney = vehicle.totalMoney + (monthsOrWeeks === 'months' ? 
-                  duration * parseInt(parkingConfig.precioMesCarros) : 
-                  duration * (parseInt(parkingConfig.precioMesCarros) / 4));
-              } else {
-                totalMoney = vehicle.totalMoney + (monthsOrWeeks === 'months' ? 
-                  duration * parseInt(parkingConfig.precioMesMotos) : 
-                  duration * (parseInt(parkingConfig.precioMesMotos) / 4));
-              }
+              totalMoney = monthsOrWeeks === 'months' ? 
+                duration * parseInt(parkingConfig.precioMesMotos) : 
+                duration * (parseInt(parkingConfig.precioMesMotos) / 4);
             }
-
-            return {
-              ...vehicle,
-              time: extendedTime,
-              formatedDate: updatedFormattedDate,
-              duration: vehicle.duration + duration,
-              totalMoney
-            };
+          } else {
+            // accumulate unpaid balance
+            if (vehicle.type === 'carro') {
+              totalMoney = vehicle.totalMoney + (monthsOrWeeks === 'months' ? 
+                duration * parseInt(parkingConfig.precioMesCarros) : 
+                duration * (parseInt(parkingConfig.precioMesCarros) / 4));
+            } else {
+              totalMoney = vehicle.totalMoney + (monthsOrWeeks === 'months' ? 
+                duration * parseInt(parkingConfig.precioMesMotos) : 
+                duration * (parseInt(parkingConfig.precioMesMotos) / 4));
+            }
           }
-          return vehicle;
-        });
 
-        saveVehicleData(updatedList);
-        return updatedList;
+          return {
+            ...vehicle,
+            time: extendedTime,
+            formatedDate: updatedFormattedDate,
+            duration: vehicle.duration + duration,
+            totalMoney
+          };
+        }
+        return vehicle;
       });
+
+      // Persist and update state
+      try {
+        await saveVehicleData(updatedList);
+      } catch (err) {
+        console.warn('Failed saving renewed list:', err);
+      }
+      setVehicles(updatedList);
+
+      // Attempt to print the renewed ticket for the specific vehicle
+      const renewed = updatedList.find(v => v.placa === placa);
+      if (renewed) {
+        try {
+          await printMonthlyTicket(renewed);
+        } catch (err) {
+          console.warn('Printing on renew failed:', err);
+        }
+      }
 
       // clear form fields after renewing
       setPlaca('');
@@ -336,6 +378,57 @@ export default function Mensualidades() {
       { cancelable: true }
     );
   }
+
+  // Print the monthly ticket (barcode + expiration date)
+  const printMonthlyTicket = async (entry: Vehicle) => {
+    if (!entry || !entry.placa) {
+      Alert.alert('Error', 'No hay placa para imprimir');
+      return;
+    }
+
+    try {
+  setIsPrinting(true);
+  // mark this print as a monthly ticket
+  setPrintingData({ placa: entry.placa, formatedDate: entry.formatedDate, type: 'MES' });
+
+      // Give the hidden ViewShot a moment to render the barcode
+      await new Promise(resolve => setTimeout(resolve, 120));
+
+      const uri = await barcodeRef.current?.capture!();
+      if (!uri) throw new Error('No se pudo generar el código de barras');
+
+      const displayDate = formatDateForPrint(entry.time ?? entry.formatedDate);
+
+  const billTypeLabel = 'Mensual';
+  const html = `
+        <html>
+          <body style="text-align:center; font-family: Arial, sans-serif; padding: 20px;">
+            <div style="border: 1px solid #000; padding: 15px; max-width: 300px; margin: 0 auto;">
+              <h2 style="margin: 0 0 10px 0;">Ticket Mensualidad</h2>
+              <p style="font-size: 18px; margin: 5px 0;">Placa: ${entry.placa}</p>
+              <p style="font-size: 14px; margin: 5px 0;">Tipo: ${billTypeLabel}</p>
+              <p style="font-size: 14px; margin: 5px 0;">Vence: ${displayDate}</p>
+              <div style="margin: 15px 0;">
+                <img src="${uri}" style="width:200px;" />
+              </div>
+              <p style="font-size: 12px; margin-top: 15px;">
+                Presente este ticket al solicitar renovación o al retirar su vehículo
+              </p>
+            </div>
+          </body>
+        </html>
+      `;
+
+      await Print.printAsync({ html, printerUrl: undefined });
+    } catch (error) {
+      console.error('Print error:', error);
+      Alert.alert('Error', 'No se pudo imprimir el ticket');
+      throw error;
+    } finally {
+      setIsPrinting(false);
+      setPrintingData(null);
+    }
+  };
 
   const saveVehicleData = async (vehicles: object) => {
   try {
@@ -583,6 +676,44 @@ export default function Mensualidades() {
         )}
         style={{ width: '100%' }}
       />
+      <View pointerEvents="none" style={{
+        position: 'absolute',
+        opacity: 0,
+        width: 300,
+        height: 100,
+      }}>
+        <ViewShot
+          ref={barcodeRef}
+          options={{
+            format: 'png',
+            quality: 1,
+            result: 'data-uri',
+            width: 300,
+            height: 100
+          }}
+          style={{ width: '100%', height: '100%' }}
+        >
+          <View style={{
+            backgroundColor: 'white',
+            width: '100%',
+            height: '100%',
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}>
+            <Barcode
+              // Include bill type suffix in barcode value (MES = Mensualidad)
+              value={printingData && printingData.placa ? `${printingData.placa.replace(/-/g, '')}-${printingData.type ?? 'MES'}` : ' '}
+              options={{
+                format: 'CODE128',
+                background: 'white',
+                height: 80,
+                width: 2
+              }}
+              rotation={0}
+            />
+          </View>
+        </ViewShot>
+      </View>
     </View>
   );
 }

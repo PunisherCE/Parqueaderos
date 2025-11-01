@@ -108,8 +108,8 @@ export default function HomeScreen() {
 
   async function handleSubmit() {
     // Create date with local timezone offset
-    const now = new Date();
-    const currentTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  // Use local Date() directly. Manual timezone arithmetic caused incorrect offsets.
+  const currentTime = new Date();
     let type: 'carro' | 'moto';
     
     if (isAlphabetic(placa[6]) || placa.length === 6) {
@@ -156,8 +156,8 @@ export default function HomeScreen() {
 
   function handleSubmit2(){
     // Create date with local timezone offset
-    const now = new Date();
-    const currentTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
+  // Use local Date() directly. Manual timezone arithmetic caused incorrect offsets.
+  const currentTime = new Date();
     let type: 'carro' | 'moto';
     
     if (isAlphabetic(placa[6]) || placa.length === 6) {
@@ -355,12 +355,14 @@ export default function HomeScreen() {
       }
 
       const currentTime = new Date().toLocaleString();
+      const billTypeLabel = 'Horaria';
       const html = `
         <html>
           <body style="text-align:center; font-family: Arial, sans-serif; padding: 20px;">
             <div style="border: 1px solid #000; padding: 15px; max-width: 300px; margin: 0 auto;">
               <h2 style="margin: 0 0 10px 0;">Ticket de Parqueo</h2>
               <p style="font-size: 18px; margin: 5px 0;">Placa: ${placa}</p>
+              <p style="font-size: 16px; margin: 5px 0;">Tipo: ${billTypeLabel}</p>
               <p style="font-size: 14px; margin: 5px 0;">Fecha: ${currentTime}</p>
               <div style="margin: 15px 0;">
                 <img src="${uri}" style="width:200px;" />
@@ -478,7 +480,8 @@ export default function HomeScreen() {
             alignItems: 'center'
           }}>
             <Barcode
-              value={placa ? placa.replace(/-/g, '') : ' '}
+              // Include bill type suffix in barcode value (HOR = Horaria)
+              value={placa ? `${placa.replace(/-/g, '')}-HOR` : ' '}
               options={{ 
                 format: 'CODE128',
                 background: 'white',

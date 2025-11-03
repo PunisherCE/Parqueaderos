@@ -108,8 +108,8 @@ export default function HomeScreen() {
 
   async function handleSubmit() {
     // Create date with local timezone offset
-  // Use local Date() directly. Manual timezone arithmetic caused incorrect offsets.
-  const currentTime = new Date();
+    // Use local Date() directly. Manual timezone arithmetic caused incorrect offsets.
+    const currentTime = new Date();
     let type: 'carro' | 'moto';
     
     if (isAlphabetic(placa[6]) || placa.length === 6) {

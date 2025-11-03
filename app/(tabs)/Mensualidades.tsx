@@ -84,6 +84,8 @@ interface Vehicle {
   totalMoney: number
 }
 
+let comparingDate: Date;
+
 export default function Mensualidades() {
   const [placa, setPlaca] = React.useState<string>('');
   const [name, setName] = React.useState<string>('');
@@ -443,6 +445,8 @@ export default function Mensualidades() {
 
   // And update loadVehicleData to parse dates:
   const loadVehicleData = async () => {
+    comparingDate = new Date(Date.now());
+
     try {
       const vehiclesJson = await AsyncStorage.getItem('mensualidadesVehicles');
       const totalJson = await AsyncStorage.getItem('parqueaderosTotal');
@@ -666,11 +670,15 @@ export default function Mensualidades() {
             setName(item.name);
           }
           }>
-            <View style={[styles.list, index % 2 === 0 ? { backgroundColor: '#222' } : { backgroundColor: '#111' }]}>
-              <Text style={{ color: '#fff', fontSize: 16 }}>{item.name} — {item.cedula}</Text>
-              <Text style={{ color: '#fff', fontSize: 16 }}>{item.placa} — {item.type}</Text>
-              <Text style={{ color: '#fff', fontSize: 16 }}>Vence: {item.formatedDate}</Text>
-              <Text style={{ color: '#fff', fontSize: 16 }}>Total a Pagar: {item.totalMoney}</Text>
+            <View style={{ width: '100%', flexDirection: 'column' }}>
+              <View style={[styles.list, index % 2 === 0 ? { backgroundColor: '#222' } : { backgroundColor: '#111' }]}>
+                <Text style={{ color: '#fff', fontSize: 16 }}>{item.name} — {item.cedula}</Text>
+                <Text style={{ color: '#fff', fontSize: 16 }}>{item.placa} — {item.type}</Text>
+                <Text style={{ color: '#fff', fontSize: 16 }}>Vence: {item.formatedDate}</Text>
+                <Text style={{ color: '#fff', fontSize: 16 }}>Total a Pagar: {item.totalMoney}</Text>
+              </View>
+              <View style={{borderRadius: '100%', height: 8, width: 8, backgroundColor: (comparingDate > item.time) ? 'red' : 'green', position: 'absolute', top: 16, right: 16}}>
+              </View>
             </View>
           </Pressable>
         )}
